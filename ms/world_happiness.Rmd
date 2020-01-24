@@ -1,0 +1,153 @@
+---
+title: "World Happiness"
+author: "Guillioli, Walter"
+date: "1/23/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#clean R environment
+rm(list = ls())
+
+#Load R packages
+require(knitr)
+require(Amelia)
+require(tidyverse)
+
+```
+
+## Introduction
+What makes us happy? It's about community, family and doing stuff we love. It's also about learning to be at peace with yourself and accept life as it is. The best book I have read on the topic is Happiness: A Guide to Developing Life's Most Important Skill by Matthieu Ricard.  
+<https://www.amazon.com/Happiness-Guide-Developing-Lifes-Important/dp/0316167258>
+
+But today let's ake a data science approach to explore it.
+
+This report is written to walk through an example of the lifeycle of a data science project. We will load, explore and prepare data. Then we will use statistics and Machine Learning algorithms to understand why people in some countries are happier than in others. This report is written for a technical audience with a focus on the aspiring data scientist.
+
+## Data Overview
+We will use the dataset provided by Kaggle. This is the World Happiness Report that was released by the United Nations as is now considered a landmark survey in the state of global happiness. The first release was in 2012 but for this report will use the data for 2019. The data ultimately comes from the Gallup World Poll. For more contest see <https://www.kaggle.com/unsdsn/world-happiness>.
+
+### Load Dataset
+First, we load the data and explore the size and structure of the data frame of 156 observations and 9 variables.
+
+```{r}
+#Set working directory
+#setwd("C:/Users/wguil/OneDrive/Documents/GitHub/world_happiness/")
+
+#Load happiness data for 2019
+d2019 <- read.csv("../data/2019.csv", stringsAsFactors = FALSE)
+
+#Make a working copy
+d <- d2019
+
+#Size of the data frame
+dim(d)
+
+#Column names, type of variable and sample values
+str(d)
+
+#Change column names to friendlier and shorter names
+colnames(d) <- c("rank", "country", "score", "gpd_pc", "social_support", "life_expectancy", "freedom" , "generosity", "corruption")
+
+#Sample of 10 observations
+kable(d[1:10,], row.names = FALSE)
+
+```
+
+One data point I would like to have is the continent of each country. I want to compare happiness in let's say Latin America and Europe. I noticed that region is present in the data from 2015 so I will add this to the data frame.
+
+```{r}
+#Load happiness data for 2015
+d2015 <- read.csv("../data/2015.csv", stringsAsFactors = FALSE)
+
+#Add Region to my dataset by merging by country name
+d <- merge(d, d2015[,c("Country", "Region")], by.x = "country", by.y = "Country", all.x = TRUE)
+
+#Change col name so every column is lower case for consistency
+names(d)[names(d) == "Region"] <- "region"
+
+#Let's look at region names and their count of countries
+table(d$region, useNA = "ifany")
+
+#VOY
+#This is not quite what I wanted as I wanted continents, so let's derive a continents column from this data
+"Europe"
+"Asia"
+"Africa"
+"Oceania/Australasia"
+"North America"
+"South America"
+"Antarctica"
+
+```
+
+
+### Missing Values
+A key part is validating if there are any missing values in the information. If there is we need to address this. A nice option is the missing values plot from the Amelia package. 
+
+```{r}
+#Plot missing values
+#missmap(d)
+
+```
+
+Unfourtunately there are some missing values for the Region of the country I need to address.
+
+```{r}
+#How many observations are missing region?
+sum(is.na(d$Region))
+
+#Since it's only 7 I will address manually
+d[is.na(d$Region),]$country
+
+```
+
+
+### Univariate Data Exploration 
+It is very important to understand what each column of data is and what type of data we are dealing with. So here we double click on each variable to understand it with summary statistics and plots.
+
+```{r}
+# $ rank           : int  1 2 3 4 5 6 7 8 9 10 ...
+# $ country        : chr  "Finland" "Denmark" "Norway" "Iceland" ...
+# $ score          : num  7.77 7.6 7.55 7.49 7.49 ...
+# $ gpd_pc         : num  1.34 1.38 1.49 1.38 1.4 ...
+# $ social_support : num  1.59 1.57 1.58 1.62 1.52 ...
+# $ life_expectancy: num  0.986 0.996 1.028 1.026 0.999 ...
+# $ freedom        : num  0.596 0.592 0.603 0.591 0.557 0.572 0.574 0.585 0.584 0.532 ...
+# $ generosity     : num  0.153 0.252 0.271 0.354 0.322 0.263 0.267 0.33 0.285 0.244 ...
+# $ corruption     : num  0.393 0.41 0.341 0.118 0.298 0.343 0.373 0.38 0.308 0.226 ...
+```
+
+### Correlations
+
+## Methods
+
+## Results
+
+## Conclusion
+
+## References
+https://datahub.io/JohnSnowLabs/country-and-continent-codes-list#resource-country-and-continent-codes-list-csv
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
