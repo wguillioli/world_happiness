@@ -2,7 +2,9 @@
 title: "World Happiness"
 author: "Guillioli, Walter"
 date: "1/23/2020"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -15,6 +17,14 @@ rm(list = ls())
 require(knitr)
 require(Amelia)
 require(tidyverse)
+require(memisc)
+require(ResourceSelection) 
+library(Hmisc)
+require(psych)
+library(corrplot)
+require(forcats)
+
+
 
 ```
 
@@ -69,85 +79,191 @@ d <- merge(d, d2015[,c("Country", "Region")], by.x = "country", by.y = "Country"
 names(d)[names(d) == "Region"] <- "region"
 
 #Let's look at region names and their count of countries
-table(d$region, useNA = "ifany")
+d %>%
+  count(region, sort = TRUE)
 
-#VOY
-#This is not quite what I wanted as I wanted continents, so let's derive a continents column from this data
-"Europe"
-"Asia"
-"Africa"
-"Oceania/Australasia"
-"North America"
-"South America"
-"Antarctica"
+#It seems 7 countries don't have a region so let's see which ones
+d[is.na(d$region),]$country
+
+#Let's add the region to these 7 countries 
+d[d$country=="Gambia", ]$region <- "Africa"
+d[d$country=="Namibia", ]$region <- "Africa"
+d[d$country=="North Macedonia", ]$region <- "Central and Eastern Europe"
+d[d$country=="Northern Cyprus", ]$region <- "Central and Eastern Europe"
+d[d$country=="Somalia", ]$region <- "Africa"
+d[d$country=="South Sudan", ]$region <- "Africa"
+d[d$country=="Trinidad & Tobago", ]$region <- "Latin America and Caribbean"
+
+#This is not quite what I wanted as I wanted continents, so let's derive a continents column. 
+#I will use the 7 continents definition but minor adjustments based on areas I want to see
+d <- d %>% 
+  mutate(continent = case_when(region == "Sub-Saharan Africa" ~ "Africa",
+                               region == "Middle East and Northern Africa" ~ "Africa",
+                               region == "Africa" ~ "Africa",
+                               region == "Southeastern Asia" ~ "Asia",
+                               region == "Southern Asia" ~ "Asia",
+                               region == "Eastern Asia" ~ "Asia",
+                               region == "Central and Eastern Europe" ~ "Europe_CEE",
+                               region == "Western Europe" ~ "Europe_WE",
+                               region == "Latin America and Caribbean" ~ "South America",
+                               region == "Australia and New Zealand" ~ "Australasia",
+                               region == "North America" ~ "North America"
+                               ))
+
+#Let's see what we have
+d %>%
+  count(continent, sort = TRUE)
+
+#Drop region since 
+d <- subset(d, select = -c(region))
 
 ```
 
 
 ### Missing Values
-A key part is validating if there are any missing values in the information. If there is we need to address this. A nice option is the missing values plot from the Amelia package. 
+A key part is validating if there are any missing values in the information. If there is we need to address this. A nice option is the missing values plot from the Amelia package. Fortunately there are not missing values in our data.
 
 ```{r}
 #Plot missing values
-#missmap(d)
+missmap(d)
 
 ```
-
-Unfourtunately there are some missing values for the Region of the country I need to address.
-
-```{r}
-#How many observations are missing region?
-sum(is.na(d$Region))
-
-#Since it's only 7 I will address manually
-d[is.na(d$Region),]$country
-
-```
-
 
 ### Univariate Data Exploration 
 It is very important to understand what each column of data is and what type of data we are dealing with. So here we double click on each variable to understand it with summary statistics and plots.
 
+I like to get a list of the variables and it's type and then explore 1x1 since it's a small dataset.
+
 ```{r}
-# $ rank           : int  1 2 3 4 5 6 7 8 9 10 ...
-# $ country        : chr  "Finland" "Denmark" "Norway" "Iceland" ...
-# $ score          : num  7.77 7.6 7.55 7.49 7.49 ...
-# $ gpd_pc         : num  1.34 1.38 1.49 1.38 1.4 ...
-# $ social_support : num  1.59 1.57 1.58 1.62 1.52 ...
-# $ life_expectancy: num  0.986 0.996 1.028 1.026 0.999 ...
-# $ freedom        : num  0.596 0.592 0.603 0.591 0.557 0.572 0.574 0.585 0.584 0.532 ...
-# $ generosity     : num  0.153 0.252 0.271 0.354 0.322 0.263 0.267 0.33 0.285 0.244 ...
-# $ corruption     : num  0.393 0.41 0.341 0.118 0.298 0.343 0.373 0.38 0.308 0.226 ...
+str(d)
 ```
 
-### Correlations
+**a) country**: the country name should be unique so let's double check no duplicates exist.
+```{r}
+sum(duplicated(d$country))
 
-## Methods
+```
 
-## Results
+**b) rank**: the country rank should go from 1 to 156 and should be unique, let's double check. 
+```{r}
+summary(d$rank)
+sum(duplicated(d$rank))
+
+```
+
+**c) score**: this is the happiness score and the main variable of interest. It ranges from 2.853 to 7.769 and has a very normal distribution, which is really a good thing since we will predict this variable later using Machine Learning algorithms. And some of them, like linear regression performs better on "normal" data.
+
+```{r}
+summary(d$score)
+
+ggplot(d, aes(score)) +
+  geom_histogram(bins = 10) + 
+  ggtitle("Histogram of Happiness Score") +
+  xlab("\nScore") + 
+  ylab("# of Countries\n")
+
+```
+
+**c) gdp, social_support, life_expectancy, freedmon, generosity and corruption**: doing what we did for score and the previous two variables is very useful but can become very tedious if we have a long dataset. Ultimately I am just interested in getting to know these variables better. Two complimentary ways to do this is getting the summary statistics to get the min, max and median values for example. Another way is plotting the histograms to get a sense of how the data is distributed. 
+
+As we can see from the summary statistics, we see all variables range from 0 to some real number. In the case of gpd the max is 1.684 and in the case of corruption it ranges from 0.453 for example.
+
+```{r}
+#variables to explore
+eda_variables <- c("gpd_pc", "social_support", "life_expectancy", 
+                    "freedom", "generosity", "corruption")
+
+#raw summary statistics
+summary(d[,eda_variables])
+
+
+```
+
+But let's plot this now to see how the data is distributed for these variables.
+
+As we can see GDP, freedom and generosity are almost normally distributed. The others skew a bit. We might explore at the end of ths paper if changing the scale of some of these variables could help us predict the happiness score. But let's leave that out for now.
+
+```{r}
+multi.hist(d[,eda_variables], bcol = "gray")
+
+
+```
+
+Another cool chart that can be used to explore distribution of data **and** relationships with each other is this one. This starts to show the correlation with each other but let's not get ahead of ourselves as we will see that later.
+
+```{r}
+kdepairs(d[,eda_variables])
+
+```
+
+### Correlations and Prediction Potential of Happiness
+Ultimately we want to use all the data provided to predict the happiness score and we will get to that. But before we need to understand our data and see which variables on their own have a strong correlation with the happiness score. We are also interested in variables that have strong correlation with each other since that might create some noise in our ML model down the road and we might need to address it.
+
+A quick first step is to plot a correlation matrix and the values will range from [-1, 1] where extremes represent strong positive/negative correlation. 
+
+```{r}
+#variables to explore correlations
+corr_variables <- c("score", eda_variables)
+
+res <- cor(d[,corr_variables])
+kable(round(res,2))
+
+```
+
+When looking at the score column we see that GDP, social_support and life_expectancy have the highest correlation and therefore the highest predictive potential. Generosity doesn't seem likely to help predict the score.
+
+Also important to highlight the correlation of GPD with social_support and life_expectancy. This is known as multi-collinearity and might cause issues later so we need to be careful when interpreting and addressing.
+
+As you can see this is getting tedious and we only have a handful of variables. An easier way to see this information is with a correlation plot. 
+
+```{r}
+corrplot(res,
+         #title = "\nCorrelation Plot of Happiness Score and numerical predictors",
+         method = "square",
+         addgrid.col = "darkgray",
+         addCoef.col = "white",  number.cex = 0.75)
+```
+
+### What about continent?
+We couldn't include continent as predictor about because it is not numerical so we can't get a correlation. A good thing to do is explore how the values of our variable of interest (happiness score) varies by values of region. I like to see the median and the different shape of the data.
+
+We can see Western Europe, North American and Australasia leading the pack with the highest scores while Africa and Central & Eastern Europe leading behind. I guess that is no surprise.
+
+```{r}
+#Median by continent
+kable(d %>%
+  group_by(continent) %>%
+  summarise(median = median(score), n = n()) %>%
+  arrange(desc(n)))
+
+#Box plot to see a bit more than just the median
+#VOY
+#https://rpubs.com/crazyhottommy/reorder-boxplot
+ggplot(d, aes(x=reorder(continent, score, FUN = median), y=score)) + 
+  geom_boxplot() + 
+  labs(title="Plot of Happiness Score by Continent\n",x="\nContinent", y = "Happiness Score\n") +
+  coord_flip()
+
+
+
+
+```
+
+
+
+
+
+## Methods and Results
+
+list top and bottom 10 countries
+happines by continent plot
 
 ## Conclusion
 
 ## References
 https://datahub.io/JohnSnowLabs/country-and-continent-codes-list#resource-country-and-continent-codes-list-csv
 
+## About the Author
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
