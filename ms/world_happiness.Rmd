@@ -23,6 +23,12 @@ library(Hmisc)
 require(psych)
 library(corrplot)
 require(forcats)
+require(gridExtra)
+#library(MASS)
+library(caret)
+
+
+
 
 
 
@@ -59,7 +65,8 @@ dim(d)
 str(d)
 
 #Change column names to friendlier and shorter names
-colnames(d) <- c("rank", "country", "score", "gpd_pc", "social_support", "life_expectancy", "freedom" , "generosity", "corruption")
+colnames(d) <- c("rank", "country", "score", "gpd_pc", "social_support", 
+                 "life_expectancy", "freedom" , "generosity", "corruption")
 
 #Sample of 10 observations
 kable(d[1:10,], row.names = FALSE)
@@ -73,7 +80,8 @@ One data point I would like to have is the continent of each country. I want to 
 d2015 <- read.csv("../data/2015.csv", stringsAsFactors = FALSE)
 
 #Add Region to my dataset by merging by country name
-d <- merge(d, d2015[,c("Country", "Region")], by.x = "country", by.y = "Country", all.x = TRUE)
+d <- merge(d, d2015[,c("Country", "Region")], by.x = "country", 
+           by.y = "Country", all.x = TRUE)
 
 #Change col name so every column is lower case for consistency
 names(d)[names(d) == "Region"] <- "region"
@@ -196,6 +204,11 @@ kdepairs(d[,eda_variables])
 
 ```
 
+## Methods and Results
+In this section we explore in more detail what variables could help explain and predict the happiness score. We beging exploring numerical correlations and then we explore the difference by continent.
+
+As a last step we build ML models to actually predict the happiness score and we compare those models.
+
 ### Correlations and Prediction Potential of Happiness
 Ultimately we want to use all the data provided to predict the happiness score and we will get to that. But before we need to understand our data and see which variables on their own have a strong correlation with the happiness score. We are also interested in variables that have strong correlation with each other since that might create some noise in our ML model down the road and we might need to address it.
 
@@ -224,10 +237,21 @@ corrplot(res,
          addCoef.col = "white",  number.cex = 0.75)
 ```
 
+Since GDP per capita is the predictor with strongest correlation to the happiness score let's take a look at it. One way to do this is to plot all the points "draw a regression line" on the plot. 
+
+```{r}
+ggplot(d, aes(x=gpd_pc, y=score)) + 
+  geom_point() +   
+  geom_smooth(method=lm, se=FALSE) + 
+  ggtitle("GDP per capita is the strongest predictor of Happiness (r = 0.79)\n") + 
+  labs(y="Happiness Score\n", x = "\nGDP per capita")
+
+```
+
 ### What about continent?
 We couldn't include continent as predictor about because it is not numerical so we can't get a correlation. A good thing to do is explore how the values of our variable of interest (happiness score) varies by values of region. I like to see the median and the different shape of the data.
 
-We can see Western Europe, North American and Australasia leading the pack with the highest scores while Africa and Central & Eastern Europe leading behind. I guess that is no surprise.
+We can see Western Europe, North American and Australasia leading the pack with the highest scores while Africa, Asia and Central & Eastern Europe leading behind. I guess that is no surprise.
 
 ```{r}
 #Median by continent
@@ -237,33 +261,165 @@ kable(d %>%
   arrange(desc(n)))
 
 #Box plot to see a bit more than just the median
-#VOY
-#https://rpubs.com/crazyhottommy/reorder-boxplot
-ggplot(d, aes(x=reorder(continent, score, FUN = median), y=score)) + 
+ggplot(d, aes(x = reorder(continent, score, FUN = median), y = score, fill = continent)) + 
   geom_boxplot() + 
-  labs(title="Plot of Happiness Score by Continent\n",x="\nContinent", y = "Happiness Score\n") +
+  labs(title="Plot of Happiness Score by Continent\n",
+       x="Continent\n", y = "\nHappiness Score") +
   coord_flip()
+```
 
+### Happiest and saddest countries
+Out of curiosity let's see what are the countries with the top scores for happiness. As expected mostly dominated by Western Europe and North Americ with scores above 7.
+
+```{r}
+
+#Top 10 countries by happiness score
+d %>%
+  arrange(desc(score)) %>%
+  slice(1:10) %>%
+  ggplot(., aes(x = reorder(country, score), y=score, fill = continent)) +
+  geom_bar(stat="identity") +
+  labs(title="Top 10 Happiest Countries\n",x="Country\n", y = "\nHappiness Score") +
+  coord_flip() + 
+  scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9")) +
+  theme(legend.position="bottom")
 
 
 
 ```
 
+But how about the bottom 10? As expected it is mostly Africa and Asia with scores below 4.
+
+```{r, echo=FALSE}
+#Bottom 10 countries by happiness score
+d %>%
+  arrange(score) %>%
+  slice(1:10) %>%
+  ggplot(., aes(x = reorder(country, score), y=score, fill = continent)) +
+  geom_bar(stat="identity") +
+  labs(title="Bottom 10 Happiest Countries\n",x="Country\n", y = "\nHappiness Score") +
+  coord_flip() + 
+  #scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9")) +
+  theme(legend.position="bottom")
+
+```
+
+### Using ML to predict happiness
+Now, this is the fun part. Can we actually use the data provided to predict the happiness score? If yes, with how much precision? For this we will be using several ML algorithms and we will be comparing each other.
+
+#### Doing it all wrong
+But first let's do it all wrong. A typical error is to use all the data and predict on the same data. This is not good because we just don't know how well the model would perform with new data. It might just overfit on exisiting data. But let's do it anyway with a simple liner regression. As can be seen and as expected the variables that help predict are GDP, social support, life expectancy and freedom. Generosity and corruption are not necessarily good predictors.
+
+```{r}
+#Fit model
+lm1 <- lm(score ~ gpd_pc + social_support + life_expectancy + freedom 
+          + generosity + corruption,
+          data=d)
+
+#summary(lm1)
 
 
+  
+```
+
+But how good is this model? One way to measure this is with Adjusted R2 which basically explains how much of the variance is captured by the model so the higher and closer to 100% the better. In this case we get a decent 77%.
+
+```{r}
+#Adj R2 
+summary(lm1)$adj.r.squared 
+```
+
+#### Doing it right
+The right way to do this is using part of the data to build the model and use the remaining data to test the model. The key is to see how good a model can be with new data. A simple way to do this is to do a one time train and one time test of the model. But here I will do this many times using cross-validation approach. I will do linear regression and random forest and will compare each other.
+
+**a) Linear Regression**
+
+```{r}
+# Define training control
+set.seed(97701) 
+train.control <- trainControl(method = "cv", number = 10)
+
+# Train the model
+lm2 <- train(score ~ gpd_pc + social_support + life_expectancy + freedom + 
+               generosity + corruption, 
+               data=d, 
+               method = "lm",
+               trControl = train.control)
+
+# Summarize the results
+print(lm2)
+```
+
+As can be seen this results in an R2 of 0.772. But what is the final model? In linear regression we get an equation with coefficients and these are:
+
+```{r}
+#Get coefficients
+lm2$finalModel
+```
+
+**b) Random Forest**
+Let's do a Random Forest which is nothing more than several trees.
+
+```{r}
+# Train the model
+rf1 <- train(score ~ gpd_pc + social_support + life_expectancy + freedom + 
+               generosity + corruption, #continent
+               data=d, 
+               method = "cforest",
+               trControl = train.control)
+
+# Summarize the results
+print(rf1)
 
 
-## Methods and Results
+```
 
-list top and bottom 10 countries
-happines by continent plot
+As can be seen by the results we get a slight improvement when mtry == 2 for an R2 of 0.820. mtry is simply how many variables are tested at each tree. We can see the main variables selected by Random Forest here.
+
+```{r}
+varImp(rf1$finalModel)
+```
+
+Since it seems Random Forest is a better algorithm let's explore visually how this looks like. In this plot we can see the actual value of the happiness scores vs the predicted ones.
+
+```{r}
+#Make a data frame of the actual score and the prediction
+res_df <- as.data.frame(cbind(d$score, predict(rf1$finalModel)))
+colnames(res_df) <- c("score_actual", "score_predicted")
+
+#Plot the results
+ggplot(res_df, aes(x=score_actual, y=score_predicted)) + 
+  geom_point() +   
+  geom_smooth(method=lm, se=FALSE) + 
+  ggtitle("Actual vs Predicted Happiness Scores\n") + 
+  labs(y="Predicted Score\n", x = "\nActual Score") +
+  xlim(2,8) +
+  ylim(2,8)
+
+```
+The blue line indicates a perfect fit. The fact that we see points deviating from the line means that there is an error in the prediction that we can't measure in the data we have. That is why we have an R2 of around 82%.
 
 ## Conclusion
+Happiness in the only logical pursuit of life. There are many things we need to do as humans such as having strong connections t our family and communities. We should also spend time doing hobbies we are passionate about and we should work on projects that are important to us (that is why I did this paper). But it seems happiness can be measured.
+
+In this short paper we explored happiness scores of countries in the world and we used data from those countries to explain and predict this score.
+
+It seems that how rich the countries are (GDP) is the most important factor but this is closely followed by how healhy and free people can be in the countries. These could be argued to be related to wealth.
+
+When modeling data we should always remember we are trying to simplify the world in an equation or an algorithm and that is hard to do. So we should treat this models carefuly. George Box said it best **"All models are wrong, but some are useful"**.
 
 ## References
-https://datahub.io/JohnSnowLabs/country-and-continent-codes-list#resource-country-and-continent-codes-list-csv
+1. Kaggle. World Happiness Data. 
+<https://www.kaggle.com/unsdsn/world-happiness>
+
+2. Datahub. Countryand Continent Codes.
+<https://bit.ly/3aZioCS>
 
 ## About the Author
+Walter Guillioli is a Data Scientist that loves to solve real life and business problems through data. Walter spent 14+ years at Microsoft helping Marketing teams make better investments and marketing strategies through the use of data.
 
+Walter founded and directs a non-profit called People Saving Animals to help homeless dogs and cats in Central America.
 
+Walter lives in Central Oregon and spends most of his time outside running on trails or spending time with his wife Alejandra and his little troublemaker Diego.
 
+Reach Walter at <wguillioli@gmail.com> or at <https://www.linkedin.com/in/walter-guillioli-69090038/>
