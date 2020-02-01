@@ -11,4 +11,4 @@ Project files:
 
 2. [R Markdown document](https://github.com/wguillioli/world_happiness/blob/master/ms/world_happiness.Rmd)
 
-3. Reports (generated files)[HTML](https://github.com/wguillioli/world_happiness/blob/master/ms/world_happiness.html), [PDF] (https://github.com/wguillioli/world_happiness/blob/master/ms/world_happiness.pdf)
+3. Reports (generated files)[HTML](https://github.com/wguillioli/world_happiness/blob/master/ms/world_happiness.html), [PDF](https://github.com/wguillioli/world_happiness/blob/master/ms/world_happiness.pdf)
