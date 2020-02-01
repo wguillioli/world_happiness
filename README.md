@@ -6,6 +6,7 @@ The purpose of the project is to show end to end the process of a data science p
 I did this project using R and specifically R Markdown to generate a nice looking PDF and HTML. Most of the code is shown due to the intent of the paper highlighted before.
 
 Project files:
+
 [Kaggle data](https://www.kaggle.com/unsdsn/world-happiness)
 
 [R Markdown document](https://github.com/wguillioli/world_happiness/blob/master/ms/world_happiness.Rmd)
