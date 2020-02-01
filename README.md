@@ -1,4 +1,4 @@
-# world_happiness
+# World Happiness
 What makes us happy? Certainly a tough question to answer. In this short project I use the happiness data provided by Kaggle where countries are ranked based on how happy people feel in those countries. The data provided includes GDP, health, corruption and life expectancy among others.
 
 The purpose of the project is to show end to end the process of a data science project from data acquisition to preparation to exploration and to modeling. The document is written for the aspiring data scientist.
