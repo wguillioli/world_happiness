@@ -7,10 +7,10 @@ I did this project using R and specifically R Markdown to generate a nice lookin
 
 Project files:
 
-[Kaggle data](https://www.kaggle.com/unsdsn/world-happiness)
+1. [Kaggle data](https://www.kaggle.com/unsdsn/world-happiness)
 
-[R Markdown document](https://github.com/wguillioli/world_happiness/blob/master/ms/world_happiness.Rmd)
+2. [R Markdown document](https://github.com/wguillioli/world_happiness/blob/master/ms/world_happiness.Rmd)
 
-[HTML generated file](https://github.com/wguillioli/world_happiness/blob/master/ms/world_happiness.html)
+3. [HTML generated file](https://github.com/wguillioli/world_happiness/blob/master/ms/world_happiness.html)
 
-[PDF generated file](https://github.com/wguillioli/world_happiness/blob/master/ms/world_happiness.pdf)
+4. [PDF generated file](https://github.com/wguillioli/world_happiness/blob/master/ms/world_happiness.pdf)
